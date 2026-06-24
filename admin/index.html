@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indoor Nav — Map Editor</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#64748b;height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
+
+/* ── Toolbar ─────────────────────────────────────────────────────── */
+.tb{background:#0f172a;color:white;padding:8px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+.tb-logo{font-size:15px;font-weight:700;color:#60a5fa;white-space:nowrap;margin-right:4px}
+.tb-g{display:flex;align-items:center;gap:5px}
+.tb-g label{font-size:10px;color:#94a3b8;white-space:nowrap}
+.tb-g input{background:#1e293b;border:1px solid #334155;color:white;padding:4px 8px;border-radius:6px;font-size:12px}
+.sp{flex:1}
+.btn{padding:6px 12px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:background .15s;white-space:nowrap}
+.btn-p{background:#3b82f6;color:white}.btn-p:hover{background:#2563eb}
+.btn-g{background:#22c55e;color:white}.btn-g:hover{background:#16a34a}
+.btn-s{background:#475569;color:white}.btn-s:hover{background:#334155}
+.btn-d{background:#ef4444;color:white}.btn-d:hover{background:#dc2626}
+.btn-o{background:#f59e0b;color:white}.btn-o:hover{background:#d97706}
+
+/* ── Floor tabs ──────────────────────────────────────────────────── */
+.fb{background:white;border-bottom:1px solid #e2e8f0;padding:0 12px;display:flex;align-items:center;gap:4px;height:38px;flex-shrink:0}
+.ft{padding:0 14px;height:100%;display:flex;align-items:center;font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;color:#64748b;transition:all .15s}
+.ft.active{border-color:#3b82f6;color:#1d4ed8}
+.ft:hover:not(.active){color:#374151}
+.fa{font-size:13px;color:#3b82f6;cursor:pointer;padding:3px 8px;border-radius:5px;font-weight:600}
+.fa:hover{background:#eff6ff}
+
+/* ── Workspace ───────────────────────────────────────────────────── */
+.ws{display:flex;flex:1;overflow:hidden;min-height:0}
+
+/* ── Left sidebar ────────────────────────────────────────────────── */
+.sl{width:118px;background:white;border-right:1px solid #e2e8f0;padding:10px;display:flex;flex-direction:column;gap:5px;flex-shrink:0;overflow-y:auto}
+.sl h3{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:1px}
+.tb-btn{width:100%;padding:7px 7px;border:2px solid #e2e8f0;background:white;border-radius:7px;cursor:pointer;font-size:11px;font-weight:600;color:#475569;text-align:left;display:flex;align-items:center;gap:5px;transition:all .15s}
+.tb-btn:hover,.tb-btn.active{border-color:#3b82f6;color:#1d4ed8;background:#eff6ff}
+.tb-btn .ic{font-size:13px;width:16px;text-align:center}
+.div{height:1px;background:#e2e8f0;margin:3px 0}
+.stats{font-size:11px;color:#64748b}
+.stats div{padding:2px 0;display:flex;justify-content:space-between}
+.stats span{font-weight:700;color:#1e293b}
+
+/* ── Canvas wrap ─────────────────────────────────────────────────── */
+.cw{flex:1;overflow:auto;background:#94a3b8;display:flex;align-items:flex-start;justify-content:flex-start;padding:20px;position:relative}
+#mc{cursor:crosshair;display:block;box-shadow:0 4px 28px rgba(0,0,0,.35)}
+.hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.88);color:white;padding:6px 16px;border-radius:20px;font-size:12px;pointer-events:none;white-space:nowrap;z-index:50}
+
+/* ── Right sidebar ───────────────────────────────────────────────── */
+.sr{width:228px;background:white;border-left:1px solid #e2e8f0;padding:13px;flex-shrink:0;overflow-y:auto}
+.sr h3{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:7px}
+.pg{margin-bottom:9px}
+.pg label{display:block;font-size:11px;font-weight:600;color:#374151;margin-bottom:3px}
+.pg input,.pg select,.pg textarea{width:100%;padding:5px 8px;border:1.5px solid #d1d5db;border-radius:6px;font-size:12px;color:#111827;background:white}
+.pg input:focus,.pg select:focus{outline:none;border-color:#3b82f6}
+.pg input[readonly]{background:#f8fafc;color:#64748b;cursor:default}
+.ns{color:#94a3b8;font-size:12px;text-align:center;padding:24px 8px;line-height:1.5}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;margin-bottom:7px}
+.bn{background:#dbeafe;color:#1d4ed8}
+.be{background:#dcfce7;color:#166534}
+.bq{background:#f3e8ff;color:#6b21a8}
+.bp{background:#fef3c7;color:#92400e}
+.tag-row{display:flex;justify-content:space-between;align-items:center;background:#f3e8ff;padding:4px 8px;border-radius:5px;margin-bottom:4px;font-size:11px}
+.tag-row span{color:#64748b}
+.tag-del{background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px;padding:0 2px;line-height:1}
+.poi-row{display:flex;justify-content:space-between;align-items:center;background:#fef3c7;padding:4px 8px;border-radius:5px;margin-bottom:4px;font-size:11px}
+
+/* ── Modal ───────────────────────────────────────────────────────── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:white;border-radius:14px;padding:24px;max-width:92vw;max-height:88vh;overflow:auto}
+.modal h2{font-size:17px;font-weight:700;margin-bottom:4px}
+.modal>p{font-size:13px;color:#64748b;margin-bottom:16px}
+.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:14px;width:820px;max-width:100%}
+.qr-card{border:1.5px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
+.qr-card canvas{margin:0 auto;display:block}
+.qr-id{font-size:10px;font-weight:700;color:#1e293b;font-family:monospace;margin-top:6px}
+.qr-lbl{font-size:11px;color:#374151;margin-top:2px;font-weight:600}
+.qr-fl{font-size:10px;color:#94a3b8;margin-top:1px}
+.ma{display:flex;gap:10px;margin-top:18px;justify-content:flex-end}
+
+/* ── Help modal ──────────────────────────────────────────────────── */
+.hm{width:680px}
+.hs{margin-bottom:16px}
+.hs h3{font-size:13px;font-weight:700;color:#1e293b;margin-bottom:5px;display:flex;align-items:center;gap:6px}
+.hs p,.hs li{font-size:12px;color:#374151;line-height:1.65}
+.hs ul{padding-left:16px}
+.hs code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:11px}
+</style>
+</head>
+<body>
+
+<!-- ═══ TOOLBAR ════════════════════════════════════════════════════════ -->
+<div class="tb">
+  <span class="tb-logo">🗺 Indoor Nav Admin</span>
+  <div class="tb-g"><label>Mall name</label><input id="iName" value="City Center Mall" style="width:155px"></div>
+  <div class="tb-g"><label>ID</label><input id="iId" value="mall_001" style="width:85px"></div>
+  <div class="tb-g"><label>m/unit</label><input id="iMpu" type="number" value="0.1" step="0.01" style="width:60px"></div>
+  <div class="tb-g"><label>Map W</label><input id="iMW" type="number" value="1000" style="width:62px" onchange="onSizeChange()"></div>
+  <div class="tb-g"><label>Map H</label><input id="iMH" type="number" value="620" style="width:58px" onchange="onSizeChange()"></div>
+  <div class="sp"></div>
+  <button class="btn btn-s" onclick="loadImage()">📁 Floor Image</button>
+  <button class="btn btn-s" onclick="importJson()">📥 Import JSON</button>
+  <button class="btn btn-p" onclick="exportJson()">💾 Export JSON</button>
+  <button class="btn btn-g" onclick="showQR()">🔲 QR Codes</button>
+  <button class="btn btn-o" onclick="showHelp()">❓ Help</button>
+</div>
+
+<!-- ═══ FLOOR TABS ══════════════════════════════════════════════════════ -->
+<div class="fb" id="fb"></div>
+
+<!-- ═══ WORKSPACE ══════════════════════════════════════════════════════ -->
+<div class="ws">
+  <!-- Tools -->
+  <div class="sl">
+    <h3>Tools</h3>
+    <button class="tb-btn active" data-t="select" onclick="setTool('select')"><span class="ic">↖</span>Select</button>
+    <button class="tb-btn" data-t="node"   onclick="setTool('node')">  <span class="ic">⊕</span>Node</button>
+    <button class="tb-btn" data-t="edge"   onclick="setTool('edge')">  <span class="ic">╌</span>Edge</button>
+    <button class="tb-btn" data-t="qr"     onclick="setTool('qr')">    <span class="ic">🔲</span>QR Code</button>
+    <button class="tb-btn" data-t="poi"    onclick="setTool('poi')">   <span class="ic">★</span>POI</button>
+    <button class="tb-btn" data-t="ifl"    onclick="setTool('ifl')">   <span class="ic">⇅</span>Inter-floor</button>
+    <div class="div"></div>
+    <h3>Current Floor</h3>
+    <button class="btn btn-s" style="font-size:11px;padding:5px;width:100%" onclick="loadImage()">📁 Set Image</button>
+    <button class="btn btn-s" style="font-size:11px;padding:5px;width:100%;margin-top:4px" onclick="deleteFloor()">🗑 Delete Floor</button>
+    <div class="div"></div>
+    <h3>Stats</h3>
+    <div class="stats" id="stats"></div>
+    <div class="div"></div>
+    <button class="btn btn-d" style="font-size:10px;padding:5px;width:100%" onclick="clearFloor()">⚠ Clear Floor</button>
+  </div>
+
+  <!-- Canvas -->
+  <div class="cw" id="cw">
+    <canvas id="mc"></canvas>
+    <div class="hint" id="hint">Select a tool from the left panel to begin</div>
+  </div>
+
+  <!-- Properties -->
+  <div class="sr" id="sr">
+    <div class="ns">Click a node, edge, QR badge, or POI to edit its properties</div>
+  </div>
+</div>
+
+<!-- ═══ QR MODAL ════════════════════════════════════════════════════════ -->
+<div class="modal-bg" id="qrModal" style="display:none">
+  <div class="modal">
+    <h2>🔲 QR Codes</h2>
+    <p>Print and laminate these. Place each one at the exact node location in the building, at eye or waist height, on a wall or column. Optimal scan distance: 20–60 cm.</p>
+    <div class="qr-grid" id="qrGrid"></div>
+    <div class="ma">
+      <button class="btn btn-s" onclick="dlZip()">⬇ Download All as ZIP</button>
+      <button class="btn btn-p" onclick="window.print()">🖨 Print All</button>
+      <button class="btn btn-s" onclick="closeModal('qrModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HELP MODAL ══════════════════════════════════════════════════════ -->
+<div class="modal-bg" id="helpModal" style="display:none">
+  <div class="modal hm">
+    <h2>📖 How to Use the Map Editor</h2>
+    <p>Build your mall map step by step, export the JSON for the app, and generate printable QR codes.</p>
+
+    <div class="hs">
+      <h3>① Set up floors</h3>
+      <ul>
+        <li>Click <strong>+ Add Floor</strong> in the tab bar. Enter a short ID (e.g. <code>G</code>, <code>U</code>, <code>B1</code>) and a display name.</li>
+        <li>Click <strong>📁 Floor Image</strong> (left panel or toolbar) to load a floor plan PNG/JPG as a background guide.</li>
+        <li>Set <code>Map W</code> / <code>Map H</code> to your coordinate scale (default 1000 × 620).</li>
+      </ul>
+    </div>
+
+    <div class="hs">
+      <h3>② Place nodes (waypoints)</h3>
+      <ul>
+        <li>Select <strong>Node ⊕</strong>, then click the map to drop walkable waypoints.</li>
+        <li>Put nodes at: every entrance, corridor intersection, escalator, elevator, and directly beside each store.</li>
+        <li>Switch to <strong>Select ↖</strong>, click a node, and give it a <em>Label</em> (e.g. "North Entrance") in the right panel — this shows on the app map.</li>
+        <li><strong>Drag</strong> to reposition. Press <kbd>Delete</kbd> to remove. Press <kbd>Esc</kbd> to cancel actions.</li>
+      </ul>
+    </div>
+
+    <div class="hs">
+      <h3>③ Draw edges (corridors)</h3>
+      <ul>
+        <li>Select <strong>Edge ╌</strong>, click node A, then click node B — a corridor line appears.</li>
+        <li>Connect every pair of nodes that a user can walk directly between.</li>
+        <li>Click an edge with <strong>Select</strong> to highlight it; press <kbd>Delete</kbd> to remove it.</li>
+      </ul>
+    </div>
+
+    <div class="hs">
+      <h3>④ Assign QR codes</h3>
+      <ul>
+        <li>Select <strong>QR Code 🔲</strong>, then click any node where you will stick a physical QR sticker.</li>
+        <li>Enter a label (printed under the QR image, e.g. "North Entrance").</li>
+        <li>Not every node needs a QR — only locations where users will physically scan (entrances, key junctions).</li>
+      </ul>
+    </div>
+
+    <div class="hs">
+      <h3>⑤ Add POIs (stores &amp; services)</h3>
+      <ul>
+        <li>Select <strong>POI ★</strong>, then click a node to attach a point of interest.</li>
+        <li>Fill in name, category, and icon — these appear in the app's search list.</li>
+        <li>A node can have multiple POIs (e.g. an intersection near both a café and a pharmacy).</li>
+      </ul>
+    </div>
+
+    <div class="hs">
+      <h3>⑥ Link floors (escalators / elevators)</h3>
+      <ul>
+        <li>Select <strong>Inter-floor ⇅</strong>, click the escalator node on the current floor.</li>
+        <li>Switch to the other floor tab, then click the matching escalator node on that floor.</li>
+        <li>The A* pathfinder will automatically route users across floors via this link.</li>
+      </ul>
+    </div>
+
+    <div class="hs">
+      <h3>⑦ Export &amp; deploy</h3>
+      <ul>
+        <li>Click <strong>💾 Export JSON</strong> — save the file as <code>app/assets/data/mall_data.json</code> and rebuild the Flutter app.</li>
+        <li>Click <strong>🔲 QR Codes</strong> to view all QR images. Download as ZIP or print directly.</li>
+        <li>Print each QR, laminate it, and affix it at the exact node location in the building.</li>
+        <li>Use <strong>📥 Import JSON</strong> to reload and continue editing an existing map.</li>
+      </ul>
+    </div>
+
+    <div class="ma">
+      <button class="btn btn-p" onclick="closeModal('helpModal')">Got it</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════
+const S = {
+  mapW: 1000, mapH: 620,
+  currentFid: 'G',
+  // floors: { fid: { id, name, imageUrl, nodes:{nid:{id,x,y,label}}, edges:[{from,to}], qrCodes:{qrId:{id,nodeId,label}} } }
+  floors: {},
+  interFloorEdges: [],  // [{fromNodeId, toNodeId, type, _fromFloor, _toFloor}]
+  pois: [],             // [{id, name, category, floorId, nodeId, icon, description}]
+  // UI
+  tool: 'select',
+  sel: null,            // {type:'node'|'edge'|'qr'|'poi', ...}
+  edgePending: null,    // nodeId awaiting second click
+  iflPending: null,     // {nodeId, floorId} awaiting second floor click
+  dragNodeId: null,
+  isDragging: false,
+  mouse: {x: 0, y: 0},
+};
+
+// ── Canvas ────────────────────────────────────────────────────────────────
+const CV = document.getElementById('mc');
+const CX = CV.getContext('2d');
+let bgImg = null;
+const CW = 900, CH = 558;  // 900/558 ≈ 1000/620 aspect ratio
+CV.width = CW; CV.height = CH;
+
+function toC(mx, my) { return {x: mx / S.mapW * CW, y: my / S.mapH * CH}; }
+function toM(cx, cy) { return {x: Math.round(cx / CW * S.mapW), y: Math.round(cy / CH * S.mapH)}; }
+function cf() { return S.floors[S.currentFid]; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════
+function mkFloor(id, name) {
+  S.floors[id] = {id, name, imageUrl: null, nodes: {}, edges: [], qrCodes: {}};
+}
+mkFloor('G', 'Ground Floor');
+renderFloorBar(); renderStats(); draw(); setTool('select');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FLOOR MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+function renderFloorBar() {
+  document.getElementById('fb').innerHTML =
+    Object.values(S.floors).map(fl =>
+      `<div class="ft${fl.id === S.currentFid ? ' active' : ''}" onclick="switchFloor('${fl.id}')">${fl.name}</div>`
+    ).join('') +
+    `<div class="fa" onclick="addFloor()">+ Add Floor</div>`;
+}
+
+function addFloor() {
+  const id = prompt('Floor ID (e.g. U, B1, 2F):');
+  if (!id) return;
+  if (S.floors[id]) { alert('That ID already exists.'); return; }
+  const name = prompt('Floor display name:', id === 'U' ? 'Upper Floor' : 'Floor ' + id);
+  if (!name) return;
+  mkFloor(id, name);
+  switchFloor(id);
+}
+
+function deleteFloor() {
+  if (Object.keys(S.floors).length <= 1) { alert('Need at least one floor.'); return; }
+  if (!confirm(`Delete floor "${cf().name}" and all its data?`)) return;
+  const fid = S.currentFid;
+  delete S.floors[fid];
+  S.interFloorEdges = S.interFloorEdges.filter(e => e._fromFloor !== fid && e._toFloor !== fid);
+  S.pois = S.pois.filter(p => p.floorId !== fid);
+  S.currentFid = Object.keys(S.floors)[0];
+  bgImg = null;
+  renderFloorBar(); renderStats(); renderProps(); draw();
+}
+
+function switchFloor(fid) {
+  S.currentFid = fid;
+  S.sel = null; S.edgePending = null;
+  const fl = S.floors[fid];
+  if (fl.imageUrl) { const i = new Image(); i.onload = () => { bgImg = i; draw(); }; i.src = fl.imageUrl; }
+  else bgImg = null;
+  renderFloorBar(); renderStats(); renderProps(); draw();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NODE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+function nextNodeId() {
+  const fid = S.currentFid;
+  let n = 1;
+  while (cf().nodes[`${fid}_${String(n).padStart(3, '0')}`]) n++;
+  return `${fid}_${String(n).padStart(3, '0')}`;
+}
+
+function addNode(cx, cy) {
+  const {x, y} = toM(cx, cy);
+  const id = nextNodeId();
+  cf().nodes[id] = {id, x, y, label: null};
+  S.sel = {type: 'node', id};
+  renderStats(); renderProps(); draw();
+}
+
+function deleteNode(id) {
+  const fl = cf();
+  delete fl.nodes[id];
+  fl.edges = fl.edges.filter(e => e.from !== id && e.to !== id);
+  S.interFloorEdges = S.interFloorEdges.filter(e => e.fromNodeId !== id && e.toNodeId !== id);
+  S.pois = S.pois.filter(p => !(p.nodeId === id && p.floorId === S.currentFid));
+  for (const [qid, qr] of Object.entries(fl.qrCodes)) { if (qr.nodeId === id) delete fl.qrCodes[qid]; }
+  S.sel = null; renderStats(); renderProps(); draw();
+}
+
+function nodeAt(cx, cy, r = 13) {
+  for (const n of Object.values(cf().nodes)) {
+    const p = toC(n.x, n.y);
+    if (Math.hypot(cx - p.x, cy - p.y) < r) return n;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EDGE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+function addEdge(a, b) {
+  if (a === b) return;
+  const fl = cf();
+  if (fl.edges.some(e => (e.from === a && e.to === b) || (e.from === b && e.to === a))) return;
+  fl.edges.push({from: a, to: b}); renderStats(); draw();
+}
+
+function deleteEdge(from, to) {
+  cf().edges = cf().edges.filter(e => !((e.from === from && e.to === to) || (e.from === to && e.to === from)));
+  S.sel = null; renderStats(); renderProps(); draw();
+}
+
+function edgeNear(cx, cy, thr = 10) {
+  const fl = cf();
+  for (const e of fl.edges) {
+    const a = fl.nodes[e.from], b = fl.nodes[e.to]; if (!a || !b) continue;
+    const pa = toC(a.x, a.y), pb = toC(b.x, b.y);
+    if (ptSegDist(cx, cy, pa.x, pa.y, pb.x, pb.y) < thr) return e;
+  }
+  return null;
+}
+
+function ptSegDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  if (!dx && !dy) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// QR CODE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+function nextQrId() {
+  const fid = S.currentFid;
+  let n = 1;
+  while (cf().qrCodes[`QR_${fid}_${String(n).padStart(2, '0')}`]) n++;
+  return `QR_${fid}_${String(n).padStart(2, '0')}`;
+}
+
+function addQr(nodeId) {
+  const node = cf().nodes[nodeId];
+  const defaultLabel = node?.label || nodeId;
+  const label = prompt('Label shown under the printed QR code:', defaultLabel);
+  if (label === null) return;
+  const id = nextQrId();
+  cf().qrCodes[id] = {id, nodeId, label: label || defaultLabel};
+  S.sel = {type: 'qr', qrId: id};
+  renderStats(); renderProps(); draw();
+}
+
+function deleteQr(qrId) {
+  delete cf().qrCodes[qrId];
+  if (S.sel?.type === 'qr' && S.sel.qrId === qrId) S.sel = null;
+  renderStats(); renderProps(); draw();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// POI MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+const POI_CATS = ['Food','Coffee','Supermarket','Shopping','Health','Services','Entertainment','Fashion','Electronics','Sports','Kids','Other'];
+const POI_ICONS = ['restaurant','local_cafe','fastfood','shopping_cart','local_pharmacy','account_balance','info','movie','checkroom','phone_iphone','directions_run','child_care','place'];
+
+function addPoi(nodeId) {
+  const name = prompt('Store / service name (e.g. "Starbucks"):');
+  if (!name) return;
+  const id = 'poi_' + Date.now();
+  S.pois.push({id, name, nodeId, floorId: S.currentFid, category: 'Shopping', icon: 'place', description: ''});
+  S.sel = {type: 'poi', poiId: id};
+  renderStats(); renderProps(); draw();
+}
+
+function deletePoi(id) {
+  S.pois = S.pois.filter(p => p.id !== id);
+  if (S.sel?.type === 'poi' && S.sel.poiId === id) S.sel = null;
+  renderStats(); renderProps(); draw();
+}
+
+function updatePoi(id, key, val) {
+  const p = S.pois.find(p => p.id === id); if (p) p[key] = val;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOL SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+const HINTS = {
+  select:  'Click to select · Drag to move · Delete key to remove · Esc to deselect',
+  node:    'Click anywhere on the map to place a walkable node',
+  edge:    'Click node A then node B to draw a corridor between them',
+  qr:      'Click a node to assign a QR sticker to that location',
+  poi:     'Click a node to attach a store or service (POI) to it',
+  ifl:     'Click the escalator node here → switch floor tab → click the matching node there',
+};
+
+function setTool(t) {
+  S.tool = t; S.edgePending = null;
+  document.querySelectorAll('.tb-btn').forEach(b => b.classList.toggle('active', b.dataset.t === t));
+  document.getElementById('hint').textContent = HINTS[t] || '';
+  CV.style.cursor = t === 'select' ? 'default' : 'crosshair';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CANVAS EVENTS
+// ═══════════════════════════════════════════════════════════════════════════
+CV.addEventListener('mousedown', e => {
+  const r = CV.getBoundingClientRect();
+  const cx = e.clientX - r.left, cy = e.clientY - r.top;
+  S.mouse = {x: cx, y: cy};
+
+  if (S.tool === 'select') {
+    // Check QR badges first (they sit above nodes)
+    for (const [qid, qr] of Object.entries(cf().qrCodes)) {
+      const n = cf().nodes[qr.nodeId]; if (!n) continue;
+      const p = toC(n.x, n.y);
+      if (Math.hypot(cx - (p.x + 20), cy - (p.y - 21)) < 12) {
+        S.sel = {type: 'qr', qrId: qid}; S.dragNodeId = null;
+        renderProps(); draw(); return;
+      }
+    }
+    const n = nodeAt(cx, cy);
+    if (n) { S.sel = {type: 'node', id: n.id}; S.dragNodeId = n.id; S.isDragging = false; renderProps(); draw(); return; }
+    const ed = edgeNear(cx, cy);
+    if (ed) { S.sel = {type: 'edge', from: ed.from, to: ed.to}; S.dragNodeId = null; renderProps(); draw(); return; }
+    S.sel = null; S.dragNodeId = null; renderProps(); draw();
+  }
+  else if (S.tool === 'node') { addNode(cx, cy); }
+  else if (S.tool === 'edge') {
+    const n = nodeAt(cx, cy); if (!n) return;
+    if (!S.edgePending) { S.edgePending = n.id; draw(); }
+    else { addEdge(S.edgePending, n.id); S.edgePending = null; draw(); }
+  }
+  else if (S.tool === 'qr') { const n = nodeAt(cx, cy); if (n) addQr(n.id); }
+  else if (S.tool === 'poi') { const n = nodeAt(cx, cy); if (n) addPoi(n.id); }
+  else if (S.tool === 'ifl') {
+    const n = nodeAt(cx, cy); if (!n) return;
+    if (!S.iflPending) {
+      S.iflPending = {nodeId: n.id, floorId: S.currentFid};
+      alert(`Node "${n.id}" on "${cf().name}" selected.\n\nNow switch to the other floor tab and click the matching escalator/elevator node there.`);
+    } else {
+      if (S.iflPending.floorId === S.currentFid) { alert('Please switch to a different floor tab first.'); return; }
+      S.interFloorEdges.push({fromNodeId: S.iflPending.nodeId, toNodeId: n.id, type: 'escalator', _fromFloor: S.iflPending.floorId, _toFloor: S.currentFid});
+      alert(`✅ Escalator link added:\n${S.iflPending.nodeId} (${S.iflPending.floorId}) ↔ ${n.id} (${S.currentFid})`);
+      S.iflPending = null; renderStats(); draw();
+    }
+  }
+});
+
+CV.addEventListener('mousemove', e => {
+  const r = CV.getBoundingClientRect();
+  const cx = e.clientX - r.left, cy = e.clientY - r.top;
+  if (S.dragNodeId && S.tool === 'select') {
+    if (!S.isDragging && Math.hypot(cx - S.mouse.x, cy - S.mouse.y) > 4) S.isDragging = true;
+    if (S.isDragging) {
+      const {x, y} = toM(cx, cy);
+      cf().nodes[S.dragNodeId].x = Math.max(0, Math.min(S.mapW, x));
+      cf().nodes[S.dragNodeId].y = Math.max(0, Math.min(S.mapH, y));
+      draw(); return;
+    }
+  }
+  if ((S.tool === 'edge' && S.edgePending) || (S.tool === 'ifl' && S.iflPending)) {
+    S.mouse = {x: cx, y: cy}; draw();
+  }
+});
+
+CV.addEventListener('mouseup', () => { S.isDragging = false; S.dragNodeId = null; });
+
+document.addEventListener('keydown', e => {
+  if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (!S.sel) return;
+    if (S.sel.type === 'node') deleteNode(S.sel.id);
+    else if (S.sel.type === 'edge') deleteEdge(S.sel.from, S.sel.to);
+    else if (S.sel.type === 'qr') deleteQr(S.sel.qrId);
+    else if (S.sel.type === 'poi') deletePoi(S.sel.poiId);
+  }
+  if (e.key === 'Escape') { S.edgePending = null; S.iflPending = null; S.sel = null; renderProps(); draw(); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════════════════════════════════
+function draw() {
+  CX.clearRect(0, 0, CW, CH);
+
+  // Background
+  if (bgImg) {
+    CX.drawImage(bgImg, 0, 0, CW, CH);
+    CX.fillStyle = 'rgba(255,255,255,0.15)'; CX.fillRect(0, 0, CW, CH);
+  } else {
+    CX.fillStyle = '#f8fafc'; CX.fillRect(0, 0, CW, CH);
+    CX.strokeStyle = '#e2e8f0'; CX.lineWidth = 1;
+    for (let x = 0; x < CW; x += 50) { CX.beginPath(); CX.moveTo(x,0); CX.lineTo(x,CH); CX.stroke(); }
+    for (let y = 0; y < CH; y += 50) { CX.beginPath(); CX.moveTo(0,y); CX.lineTo(CW,y); CX.stroke(); }
+  }
+
+  const fl = cf();
+
+  // Inter-floor markers on this floor
+  for (const ife of S.interFloorEdges) {
+    const nodeHere = ife._fromFloor === S.currentFid ? ife.fromNodeId : ife._toFloor === S.currentFid ? ife.toNodeId : null;
+    if (!nodeHere) continue;
+    const n = fl.nodes[nodeHere]; if (!n) continue;
+    const p = toC(n.x, n.y);
+    CX.fillStyle = '#7c3aed'; CX.font = 'bold 14px sans-serif'; CX.textAlign = 'center';
+    CX.fillText('⇅', p.x, p.y - 30);
+  }
+
+  // Edges
+  for (const e of fl.edges) {
+    const a = fl.nodes[e.from], b = fl.nodes[e.to]; if (!a || !b) continue;
+    const pa = toC(a.x, a.y), pb = toC(b.x, b.y);
+    const isSel = S.sel?.type === 'edge' && ((S.sel.from === e.from && S.sel.to === e.to) || (S.sel.from === e.to && S.sel.to === e.from));
+    CX.strokeStyle = isSel ? '#f59e0b' : (bgImg ? '#1e3a5f' : '#94a3b8');
+    CX.lineWidth = isSel ? 4 : 2.5;
+    CX.beginPath(); CX.moveTo(pa.x, pa.y); CX.lineTo(pb.x, pb.y); CX.stroke();
+  }
+
+  // Edge/IFL preview line
+  if ((S.tool === 'edge' && S.edgePending) || (S.tool === 'ifl' && S.iflPending)) {
+    const pendingId = S.edgePending || (S.iflPending?.floorId === S.currentFid ? S.iflPending.nodeId : null);
+    if (pendingId) {
+      const a = fl.nodes[pendingId];
+      if (a) {
+        const pa = toC(a.x, a.y);
+        CX.strokeStyle = S.tool === 'ifl' ? '#7c3aed' : '#3b82f6';
+        CX.lineWidth = 2; CX.setLineDash([6, 4]);
+        CX.beginPath(); CX.moveTo(pa.x, pa.y); CX.lineTo(S.mouse.x, S.mouse.y); CX.stroke();
+        CX.setLineDash([]);
+      }
+    }
+  }
+
+  // POI indicators (orange star badge above node)
+  for (const poi of S.pois.filter(p => p.floorId === S.currentFid)) {
+    const n = fl.nodes[poi.nodeId]; if (!n) continue;
+    const p = toC(n.x, n.y);
+    CX.fillStyle = '#f59e0b';
+    CX.beginPath(); CX.arc(p.x, p.y - 22, 8, 0, Math.PI * 2); CX.fill();
+    CX.fillStyle = 'white'; CX.font = '10px sans-serif'; CX.textAlign = 'center';
+    CX.fillText('★', p.x, p.y - 19);
+  }
+
+  // QR badges (purple pill above node)
+  for (const [qid, qr] of Object.entries(fl.qrCodes)) {
+    const n = fl.nodes[qr.nodeId]; if (!n) continue;
+    const p = toC(n.x, n.y);
+    const isSel = S.sel?.type === 'qr' && S.sel.qrId === qid;
+    CX.fillStyle = isSel ? '#6d28d9' : '#7c3aed';
+    const tx = p.x + 3, ty = p.y - 33, tw = 40, th = 14;
+    CX.beginPath();
+    if (CX.roundRect) CX.roundRect(tx, ty, tw, th, 3); else CX.rect(tx, ty, tw, th);
+    CX.fill();
+    CX.fillStyle = 'white'; CX.font = 'bold 7.5px monospace'; CX.textAlign = 'left';
+    CX.fillText(qid.length > 9 ? qid.slice(-6) : qid, tx + 2, ty + 10);
+  }
+
+  // Nodes
+  for (const n of Object.values(fl.nodes)) {
+    const p = toC(n.x, n.y);
+    const isSel = S.sel?.type === 'node' && S.sel.id === n.id;
+    const isPend = S.edgePending === n.id || (S.iflPending?.floorId === S.currentFid && S.iflPending?.nodeId === n.id);
+
+    if (isSel || isPend) {
+      CX.fillStyle = isPend ? 'rgba(245,158,11,0.28)' : 'rgba(59,130,246,0.22)';
+      CX.beginPath(); CX.arc(p.x, p.y, 17, 0, Math.PI * 2); CX.fill();
+    }
+    CX.fillStyle = isPend ? '#d97706' : '#3b82f6';
+    CX.beginPath(); CX.arc(p.x, p.y, 9, 0, Math.PI * 2); CX.fill();
+    CX.strokeStyle = 'white'; CX.lineWidth = 2.5; CX.stroke();
+
+    // Labels
+    const labelColor = bgImg ? '#0f172a' : '#1e293b';
+    CX.fillStyle = labelColor; CX.font = 'bold 9px sans-serif'; CX.textAlign = 'center';
+    CX.fillText(n.id, p.x, p.y + 21);
+    if (n.label) { CX.fillStyle = '#475569'; CX.font = '9px sans-serif'; CX.fillText(n.label, p.x, p.y + 31); }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PROPERTIES PANEL
+// ═══════════════════════════════════════════════════════════════════════════
+function renderProps() {
+  const panel = document.getElementById('sr');
+  if (!S.sel) { panel.innerHTML = '<div class="ns">Click a node, edge, QR badge, or POI to edit its properties</div>'; return; }
+
+  if (S.sel.type === 'node') {
+    const n = cf().nodes[S.sel.id]; if (!n) { panel.innerHTML = ''; return; }
+    const qrs = Object.entries(cf().qrCodes).filter(([,q]) => q.nodeId === n.id);
+    const flPois = S.pois.filter(p => p.nodeId === n.id && p.floorId === S.currentFid);
+    panel.innerHTML = `
+      <h3>Properties</h3>
+      <span class="badge bn">Node</span>
+      <div class="pg"><label>Node ID</label><input value="${n.id}" readonly></div>
+      <div class="pg"><label>Label (landmark name)</label>
+        <input id="nlbl" value="${n.label || ''}" placeholder="e.g. North Entrance"
+          oninput="cf().nodes['${n.id}'].label=this.value;draw()"></div>
+      <div class="pg" style="display:flex;gap:6px">
+        <div style="flex:1"><label>X</label><input type="number" value="${n.x}" oninput="cf().nodes['${n.id}'].x=+this.value;draw()"></div>
+        <div style="flex:1"><label>Y</label><input type="number" value="${n.y}" oninput="cf().nodes['${n.id}'].y=+this.value;draw()"></div>
+      </div>
+      <div class="div"></div>
+      <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:5px">QR codes on this node</div>
+      ${qrs.map(([qid, qr]) => `<div class="tag-row"><span style="font-family:monospace;font-weight:700">${qid}</span><span>${qr.label}</span><button class="tag-del" onclick="deleteQr('${qid}')">✕</button></div>`).join('')}
+      <button class="btn btn-s" style="width:100%;font-size:11px;padding:5px;margin-bottom:8px" onclick="addQr('${n.id}')">+ Add QR code here</button>
+      <div class="div"></div>
+      <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:5px">POIs on this node</div>
+      ${flPois.map(p => `<div class="poi-row"><span style="font-weight:600">${p.name}</span><span>${p.category}</span><button class="tag-del" onclick="deletePoi('${p.id}')">✕</button></div>`).join('')}
+      <button class="btn btn-s" style="width:100%;font-size:11px;padding:5px;margin-bottom:8px" onclick="addPoi('${n.id}')">+ Add POI here</button>
+      <div class="div"></div>
+      <button class="btn btn-d" style="width:100%;font-size:11px;padding:5px" onclick="deleteNode('${n.id}')">🗑 Delete Node</button>`;
+  }
+  else if (S.sel.type === 'edge') {
+    panel.innerHTML = `
+      <h3>Properties</h3>
+      <span class="badge be">Corridor Edge</span>
+      <div class="pg"><label>From</label><input value="${S.sel.from}" readonly></div>
+      <div class="pg"><label>To</label><input value="${S.sel.to}" readonly></div>
+      <button class="btn btn-d" style="width:100%;font-size:11px;padding:5px;margin-top:6px" onclick="deleteEdge('${S.sel.from}','${S.sel.to}')">🗑 Delete Edge</button>`;
+  }
+  else if (S.sel.type === 'qr') {
+    const qr = cf().qrCodes[S.sel.qrId]; if (!qr) { panel.innerHTML = ''; return; }
+    panel.innerHTML = `
+      <h3>Properties</h3>
+      <span class="badge bq">QR Code</span>
+      <div class="pg"><label>QR ID (encoded in sticker)</label><input value="${S.sel.qrId}" readonly></div>
+      <div class="pg"><label>Linked to node</label><input value="${qr.nodeId}" readonly></div>
+      <div class="pg"><label>Label (printed under QR)</label>
+        <input value="${qr.label}" oninput="cf().qrCodes['${S.sel.qrId}'].label=this.value"></div>
+      <button class="btn btn-d" style="width:100%;font-size:11px;padding:5px;margin-top:6px" onclick="deleteQr('${S.sel.qrId}')">🗑 Delete QR Code</button>`;
+  }
+  else if (S.sel.type === 'poi') {
+    const poi = S.pois.find(p => p.id === S.sel.poiId); if (!poi) { panel.innerHTML = ''; return; }
+    panel.innerHTML = `
+      <h3>Properties</h3>
+      <span class="badge bp">POI</span>
+      <div class="pg"><label>Name</label><input value="${poi.name}" oninput="updatePoi('${poi.id}','name',this.value)"></div>
+      <div class="pg"><label>Category</label>
+        <select onchange="updatePoi('${poi.id}','category',this.value)">
+          ${POI_CATS.map(c => `<option${poi.category === c ? ' selected' : ''}>${c}</option>`).join('')}
+        </select></div>
+      <div class="pg"><label>Icon</label>
+        <select onchange="updatePoi('${poi.id}','icon',this.value)">
+          ${POI_ICONS.map(i => `<option${poi.icon === i ? ' selected' : ''}>${i}</option>`).join('')}
+        </select></div>
+      <div class="pg"><label>Description</label>
+        <textarea oninput="updatePoi('${poi.id}','description',this.value)" style="height:54px;resize:vertical">${poi.description || ''}</textarea></div>
+      <button class="btn btn-d" style="width:100%;font-size:11px;padding:5px" onclick="deletePoi('${poi.id}')">🗑 Delete POI</button>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════════════════════════════════════════
+function renderStats() {
+  const fl = cf();
+  document.getElementById('stats').innerHTML = `
+    <div><span>${Object.keys(fl.nodes).length}</span> Nodes</div>
+    <div><span>${fl.edges.length}</span> Edges</div>
+    <div><span>${Object.keys(fl.qrCodes).length}</span> QR codes</div>
+    <div><span>${S.pois.filter(p => p.floorId === S.currentFid).length}</span> POIs</div>
+    <div><span>${S.interFloorEdges.length}</span> Floor links</div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// IMAGE LOADING
+// ═══════════════════════════════════════════════════════════════════════════
+function loadImage() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      cf().imageUrl = ev.target.result;
+      const img = new Image(); img.onload = () => { bgImg = img; draw(); }; img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function onSizeChange() {
+  S.mapW = parseInt(document.getElementById('iMW').value) || 1000;
+  S.mapH = parseInt(document.getElementById('iMH').value) || 620;
+  draw();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPORT JSON  (exact format the Flutter app expects)
+// ═══════════════════════════════════════════════════════════════════════════
+function exportJson() {
+  const id = document.getElementById('iId').value;
+  const name = document.getElementById('iName').value;
+  const metersPerUnit = parseFloat(document.getElementById('iMpu').value);
+
+  const floors = Object.values(S.floors).map(fl => ({
+    id: fl.id,
+    name: fl.name,
+    nodes: Object.values(fl.nodes).map(n => {
+      const o = {id: n.id, x: n.x, y: n.y};
+      if (n.label) o.label = n.label;
+      return o;
+    }),
+    edges: fl.edges.map(e => ({from: e.from, to: e.to})),
+    qrCodes: Object.values(fl.qrCodes).map(q => ({id: q.id, nodeId: q.nodeId, label: q.label})),
+  }));
+
+  const json = {
+    id, name,
+    mapWidth: S.mapW,
+    mapHeight: S.mapH,
+    metersPerUnit,
+    floors,
+    interFloorEdges: S.interFloorEdges.map(e => ({fromNodeId: e.fromNodeId, toNodeId: e.toNodeId, type: e.type})),
+    pois: S.pois.map(p => ({id: p.id, name: p.name, category: p.category, floorId: p.floorId, nodeId: p.nodeId, icon: p.icon, description: p.description || ''})),
+  };
+
+  const blob = new Blob([JSON.stringify(json, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `${id}.json`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// IMPORT JSON
+// ═══════════════════════════════════════════════════════════════════════════
+function importJson() {
+  const input = document.createElement('input'); input.type = 'file'; input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        document.getElementById('iId').value = d.id || 'mall_001';
+        document.getElementById('iName').value = d.name || 'My Mall';
+        document.getElementById('iMpu').value = d.metersPerUnit || 0.1;
+        document.getElementById('iMW').value = d.mapWidth || 1000;
+        document.getElementById('iMH').value = d.mapHeight || 620;
+        S.mapW = d.mapWidth || 1000; S.mapH = d.mapHeight || 620;
+        S.floors = {};
+        for (const fl of d.floors || []) {
+          const nodes = {}; for (const n of fl.nodes || []) nodes[n.id] = {...n};
+          const qrCodes = {}; for (const q of fl.qrCodes || []) qrCodes[q.id] = {...q};
+          S.floors[fl.id] = {id: fl.id, name: fl.name, imageUrl: null, nodes, edges: [...(fl.edges || [])], qrCodes};
+        }
+        S.interFloorEdges = (d.interFloorEdges || []).map(e => {
+          let fromF = null, toF = null;
+          for (const fl of Object.values(S.floors)) {
+            if (fl.nodes[e.fromNodeId]) fromF = fl.id;
+            if (fl.nodes[e.toNodeId]) toF = fl.id;
+          }
+          return {...e, _fromFloor: fromF, _toFloor: toF};
+        });
+        S.pois = [...(d.pois || [])];
+        S.currentFid = Object.keys(S.floors)[0] || 'G';
+        bgImg = null;
+        renderFloorBar(); renderStats(); renderProps(); draw();
+        alert('✅ Imported successfully!');
+      } catch (err) { alert('Failed to parse JSON:\n' + err.message); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// QR MODAL
+// ═══════════════════════════════════════════════════════════════════════════
+function showQR() {
+  const totalQr = Object.values(S.floors).reduce((n, fl) => n + Object.keys(fl.qrCodes).length, 0);
+  if (totalQr === 0) { alert('No QR codes yet. Use the QR Code tool to assign codes to nodes first.'); return; }
+  document.getElementById('qrModal').style.display = 'flex';
+  const grid = document.getElementById('qrGrid'); grid.innerHTML = '';
+
+  for (const fl of Object.values(S.floors)) {
+    for (const [qid, qr] of Object.entries(fl.qrCodes)) {
+      const card = document.createElement('div'); card.className = 'qr-card';
+      card.dataset.qrId = qid; card.dataset.lbl = qr.label;
+
+      const qrDiv = document.createElement('div'); card.appendChild(qrDiv);
+
+      const idEl = document.createElement('div'); idEl.className = 'qr-id'; idEl.textContent = qid; card.appendChild(idEl);
+      const lblEl = document.createElement('div'); lblEl.className = 'qr-lbl'; lblEl.textContent = qr.label; card.appendChild(lblEl);
+      const flEl = document.createElement('div'); flEl.className = 'qr-fl'; flEl.textContent = fl.name; card.appendChild(flEl);
+
+      grid.appendChild(card);
+      new QRCode(qrDiv, {text: qid, width: 120, height: 120, correctLevel: QRCode.CorrectLevel.M});
+    }
+  }
+}
+
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+function showHelp() { document.getElementById('helpModal').style.display = 'flex'; }
+
+async function dlZip() {
+  if (!window.JSZip) { alert('JSZip not loaded, try again.'); return; }
+  const zip = new JSZip();
+  for (const card of document.querySelectorAll('.qr-card')) {
+    const qid = card.dataset.qrId, lbl = card.dataset.lbl;
+    const canvas = card.querySelector('canvas'); if (!canvas) continue;
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    zip.file(`${qid}_${lbl.replace(/[^a-z0-9]/gi, '_')}.png`, blob);
+  }
+  const content = await zip.generateAsync({type: 'blob'});
+  const url = URL.createObjectURL(content);
+  const a = document.createElement('a'); a.href = url; a.download = 'qr_codes.zip'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLEAR FLOOR
+// ═══════════════════════════════════════════════════════════════════════════
+function clearFloor() {
+  if (!confirm(`Clear ALL data on "${cf().name}"? This cannot be undone.`)) return;
+  const fid = S.currentFid;
+  cf().nodes = {}; cf().edges = []; cf().qrCodes = {};
+  S.pois = S.pois.filter(p => p.floorId !== fid);
+  S.interFloorEdges = S.interFloorEdges.filter(e => e._fromFloor !== fid && e._toFloor !== fid);
+  S.sel = null; S.edgePending = null;
+  renderStats(); renderProps(); draw();
+}
+</script>
+</body>
+</html>
