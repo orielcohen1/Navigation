@@ -16,14 +16,18 @@ class AppState extends ChangeNotifier {
   // ── State ─────────────────────────────────────────────────────────────────
 
   MallData? _mallData;
+
+  /// Cached for the lifetime of the session — graph built once on data load.
+  PathfindingService? _pathfinder;
+
   bool _loading = false;
   String? _error;
 
   String _currentFloorId = 'G';
-  String? _userNodeId;          // null until the first QR code is scanned
+  String? _userNodeId;       // null until the first QR code is scanned
   POI? _destination;
   NavigationPath? _path;
-  double _deviceHeading = 0;    // compass degrees, 0 = north, clockwise
+  double _deviceHeading = 0; // compass degrees, 0 = north, clockwise
 
   // ── Getters ───────────────────────────────────────────────────────────────
 
@@ -39,7 +43,10 @@ class AppState extends ChangeNotifier {
 
   bool get hasLocation => _userNodeId != null;
   bool get hasDestination => _destination != null;
-  bool get hasArrived => _userNodeId != null && _destination != null && _userNodeId == _destination!.nodeId;
+  bool get hasArrived =>
+      _userNodeId != null &&
+      _destination != null &&
+      _userNodeId == _destination!.nodeId;
   bool get isNavigating => _path != null && !_path!.isEmpty && !hasArrived;
 
   /// The next node the user should walk toward, used for the AR arrow.
@@ -59,6 +66,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       _mallData = await _dataService.loadMallData();
+      // Build graph once — reused for every subsequent findPath call
+      _pathfinder = PathfindingService(_mallData!);
       _currentFloorId = _mallData!.floors.keys.first;
     } catch (e) {
       _error = 'Failed to load mall data: $e';
@@ -76,7 +85,7 @@ class AppState extends ChangeNotifier {
 
     final (floorId, nodeId) = resolved;
     _userNodeId = nodeId;
-    _currentFloorId = floorId;
+    _currentFloorId = floorId; // switch map to user's floor so route is visible
     _recalculatePath();
     notifyListeners();
   }
@@ -100,8 +109,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Updated continuously by the compass stream in [ARScreen].
-  /// Does NOT call notifyListeners — ARScreen reads heading from local state.
+  /// Updated continuously by the compass stream in [ARScreen] and [MapScreen].
+  /// Does NOT call notifyListeners — screens read heading from their own local state.
   void updateHeading(double heading) {
     _deviceHeading = heading;
   }
@@ -109,10 +118,10 @@ class AppState extends ChangeNotifier {
   // ── Internal ──────────────────────────────────────────────────────────────
 
   void _recalculatePath() {
-    if (_mallData == null || _userNodeId == null || _destination == null) {
+    if (_pathfinder == null || _userNodeId == null || _destination == null) {
       _path = null;
       return;
     }
-    _path = PathfindingService(_mallData!).findPath(_userNodeId!, _destination!.nodeId);
+    _path = _pathfinder!.findPath(_userNodeId!, _destination!.nodeId);
   }
 }
