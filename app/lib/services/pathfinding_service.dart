@@ -40,11 +40,10 @@ class PathfindingService {
   /// Reverse lookup: nodeId → floorId — O(1).
   late final Map<String, String> _nodeToFloor;
 
-  /// Unified adjacency list across all floors, including inter-floor edges.
-  late final Map<String, List<(String, double)>> _graph;
+  /// Unified adjacency list: nodeId → list of (neighborId, edgeCost).
+  late final Map<String, List<_Edge>> _graph;
 
   /// Set of "fromId|toId" strings for every inter-floor edge (both directions).
-  /// Used in O(1) distance reconstruction to correctly account for escalator cost.
   late final Set<String> _interFloorPairs;
 
   static const double _interFloorCost = 50.0;
@@ -64,32 +63,37 @@ class PathfindingService {
         nodeToFloor[node.id] = floor.id;
       }
     }
-    _allNodes = Map.unmodifiable(nodes);
-    _nodeToFloor = Map.unmodifiable(nodeToFloor);
+    _allNodes = nodes;
+    _nodeToFloor = nodeToFloor;
 
     // ── Unified graph ──────────────────────────────────────────────────────────
-    final graph = <String, List<(String, double)>>{};
+    final graph = <String, List<_Edge>>{};
+
     for (final floor in mallData.floors.values) {
       for (final entry in floor.buildAdjacency().entries) {
-        graph[entry.key] = List.of(entry.value);
+        graph[entry.key] = [
+          for (final neighbor in entry.value)
+            _Edge(neighbor.$1, neighbor.$2),
+        ];
       }
     }
+
     for (final ife in mallData.interFloorEdges) {
-      if (!_allNodes.containsKey(ife.fromNodeId) || !_allNodes.containsKey(ife.toNodeId)) {
+      if (!nodes.containsKey(ife.fromNodeId) || !nodes.containsKey(ife.toNodeId)) {
         continue;
       }
-      graph.putIfAbsent(ife.fromNodeId, () => []).add((ife.toNodeId, _interFloorCost));
-      graph.putIfAbsent(ife.toNodeId, () => []).add((ife.fromNodeId, _interFloorCost));
+      graph.putIfAbsent(ife.fromNodeId, () => []).add(_Edge(ife.toNodeId, _interFloorCost));
+      graph.putIfAbsent(ife.toNodeId, () => []).add(_Edge(ife.fromNodeId, _interFloorCost));
     }
-    _graph = Map.unmodifiable(graph);
+    _graph = graph;
 
     // ── Inter-floor pair set ───────────────────────────────────────────────────
-    _interFloorPairs = {
-      for (final e in mallData.interFloorEdges) ...[
-        '${e.fromNodeId}|${e.toNodeId}',
-        '${e.toNodeId}|${e.fromNodeId}',
-      ],
-    };
+    final pairs = <String>{};
+    for (final e in mallData.interFloorEdges) {
+      pairs.add('${e.fromNodeId}|${e.toNodeId}');
+      pairs.add('${e.toNodeId}|${e.fromNodeId}');
+    }
+    _interFloorPairs = pairs;
   }
 
   // ── Public API ───────────────────────────────────────────────────────────────
@@ -99,7 +103,12 @@ class PathfindingService {
   NavigationPath? findPath(String startNodeId, String endNodeId) {
     if (startNodeId == endNodeId) {
       return NavigationPath(
-        segments: [PathSegment(nodeId: startNodeId, floorId: _nodeToFloor[startNodeId] ?? '')],
+        segments: [
+          PathSegment(
+            nodeId: startNodeId,
+            floorId: _nodeToFloor[startNodeId] ?? '',
+          ),
+        ],
         totalDistanceUnits: 0,
       );
     }
@@ -109,21 +118,19 @@ class PathfindingService {
 
     final endFloorId = _nodeToFloor[endNodeId] ?? '';
 
-    // g[node] = best known cost from start to node
     final gScore = <String, double>{startNodeId: 0.0};
     final cameFrom = <String, String>{};
     final visited = <String>{};
 
-    // Store (fScore, nodeId) so the priority is fixed at insertion time —
-    // avoids the bug where a mutable gScore inside the comparator corrupts
-    // heap ordering when gScores are updated later.
-    final openSet = PriorityQueue<(double, String)>(
-      (a, b) => a.$1.compareTo(b.$1),
+    // Store (fScore, nodeId) so priority is fixed at insertion — avoids the
+    // bug where a mutable gScore inside the comparator corrupts heap ordering.
+    final openSet = PriorityQueue<_QEntry>(
+      (a, b) => a.fScore.compareTo(b.fScore),
     );
-    openSet.add((_heuristic(startNodeId, endNode, endFloorId), startNodeId));
+    openSet.add(_QEntry(_heuristic(startNodeId, endNode, endFloorId), startNodeId));
 
     while (openSet.isNotEmpty) {
-      final (_, current) = openSet.removeFirst();
+      final current = openSet.removeFirst().nodeId;
 
       if (visited.contains(current)) continue; // stale entry — skip
       visited.add(current);
@@ -132,16 +139,19 @@ class PathfindingService {
         return _reconstructPath(cameFrom, endNodeId);
       }
 
-      for (final (neighborId, edgeWeight) in _graph[current] ?? const []) {
-        if (visited.contains(neighborId)) continue;
+      final neighbors = _graph[current];
+      if (neighbors == null) continue;
 
-        final tentativeG = gScore[current]! + edgeWeight;
-        if (tentativeG < (gScore[neighborId] ?? double.infinity)) {
-          gScore[neighborId] = tentativeG;
-          cameFrom[neighborId] = current;
-          // Insert new entry with updated fScore; stale entry handled by visited set
-          final f = tentativeG + _heuristic(neighborId, endNode, endFloorId);
-          openSet.add((f, neighborId));
+      for (final edge in neighbors) {
+        if (visited.contains(edge.toId)) continue;
+
+        final tentativeG = gScore[current]! + edge.cost;
+        final prevG = gScore[edge.toId] ?? double.infinity;
+        if (tentativeG < prevG) {
+          gScore[edge.toId] = tentativeG;
+          cameFrom[edge.toId] = current;
+          final f = tentativeG + _heuristic(edge.toId, endNode, endFloorId);
+          openSet.add(_QEntry(f, edge.toId));
         }
       }
     }
@@ -153,11 +163,6 @@ class PathfindingService {
 
   /// Admissible heuristic: Euclidean distance to goal + one inter-floor cost
   /// when [nodeId] is on a different floor than the destination.
-  ///
-  /// Adding the inter-floor cost is admissible because any cross-floor path
-  /// must traverse at least one inter-floor edge of exactly [_interFloorCost].
-  /// This guides A* toward the escalator/elevator rather than exploring the
-  /// wrong floor exhaustively.
   double _heuristic(String nodeId, MapNode endNode, String endFloorId) {
     final node = _allNodes[nodeId];
     if (node == null) return double.infinity;
@@ -166,8 +171,10 @@ class PathfindingService {
     return h;
   }
 
-  NavigationPath _reconstructPath(Map<String, String> cameFrom, String endNodeId) {
-    // Walk back from end to start
+  NavigationPath _reconstructPath(
+    Map<String, String> cameFrom,
+    String endNodeId,
+  ) {
     final ids = <String>[];
     var current = endNodeId;
     while (cameFrom.containsKey(current)) {
@@ -190,8 +197,8 @@ class PathfindingService {
       if (i > 0) {
         final prevId = orderedIds[i - 1];
         if (_interFloorPairs.contains('$prevId|$nodeId')) {
-          // Inter-floor transition: use fixed cost, not Euclidean
-          // (the two nodes may share 2D coordinates making Euclidean = 0)
+          // Use fixed cost for inter-floor transitions — Euclidean is 0
+          // when the two nodes share 2D coordinates (e.g. same escalator point).
           total += _interFloorCost;
         } else {
           final prev = _allNodes[prevId];
@@ -203,4 +210,18 @@ class PathfindingService {
 
     return NavigationPath(segments: segments, totalDistanceUnits: total);
   }
+}
+
+// ── Private helpers ────────────────────────────────────────────────────────────
+
+class _Edge {
+  final String toId;
+  final double cost;
+  const _Edge(this.toId, this.cost);
+}
+
+class _QEntry {
+  final double fScore;
+  final String nodeId;
+  const _QEntry(this.fScore, this.nodeId);
 }
