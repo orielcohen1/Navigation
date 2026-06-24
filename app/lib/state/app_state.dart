@@ -43,6 +43,16 @@ class AppState extends ChangeNotifier {
 
   bool get hasLocation => _userNodeId != null;
   bool get hasDestination => _destination != null;
+
+  /// Human-readable name for the user's current node, or null if unknown.
+  String? get currentLocationName {
+    if (_userNodeId == null || _mallData == null) return null;
+    for (final floor in _mallData!.floors.values) {
+      final node = floor.nodes[_userNodeId];
+      if (node != null) return node.label ?? _userNodeId;
+    }
+    return _userNodeId;
+  }
   bool get hasArrived =>
       _userNodeId != null &&
       _destination != null &&

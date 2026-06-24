@@ -200,6 +200,7 @@ class _LocationBanner extends StatelessWidget {
     }
 
     if (appState.hasLocation) {
+      final locationName = appState.currentLocationName;
       return Container(
         color: Colors.green.shade50,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -207,9 +208,20 @@ class _LocationBanner extends StatelessWidget {
           children: [
             Icon(Icons.location_on, color: Colors.green.shade700, size: 18),
             const SizedBox(width: 8),
-            Text(
-              'Location known — tap a destination below',
-              style: TextStyle(color: Colors.green.shade800, fontSize: 13),
+            Expanded(
+              child: RichText(
+                text: TextSpan(
+                  style: TextStyle(color: Colors.green.shade800, fontSize: 13),
+                  children: [
+                    const TextSpan(text: 'You are at '),
+                    TextSpan(
+                      text: locationName ?? 'known location',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const TextSpan(text: ' — tap a destination below'),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
