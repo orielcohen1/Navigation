@@ -1,12 +1,41 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../widgets/floor_map_painter.dart';
 
 /// Interactive floor map with pan and pinch-zoom support.
 /// Shows: corridor graph · active route · user position · destination.
-class MapScreen extends StatelessWidget {
+/// The user dot shows a directional cone using the device compass.
+class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
+
+  @override
+  State<MapScreen> createState() => _MapScreenState();
+}
+
+class _MapScreenState extends State<MapScreen> {
+  StreamSubscription<CompassEvent>? _compassSub;
+  double? _heading; // null = compass not available
+
+  @override
+  void initState() {
+    super.initState();
+    _compassSub = FlutterCompass.events?.listen((event) {
+      if (event.heading == null || !mounted) return;
+      // Only rebuild when heading changes by more than 3° to avoid excessive repaints
+      if (_heading == null || (event.heading! - _heading!).abs() > 3) {
+        setState(() => _heading = event.heading!);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _compassSub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +81,7 @@ class MapScreen extends StatelessWidget {
                     path: appState.path,
                     userNodeId: appState.userNodeId,
                     destinationNodeId: appState.destination?.nodeId,
+                    userHeading: _heading,
                   ),
                 ),
               ),

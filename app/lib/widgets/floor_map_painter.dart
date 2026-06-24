@@ -9,15 +9,17 @@ import '../services/pathfinding_service.dart';
 ///   1. Corridor edges (grey)
 ///   2. Active route (blue, thick)
 ///   3. POI markers (orange circles)
-///   4. User position (blue pulsing dot)
-///   5. Destination marker (red pin)
-///   6. Node labels for named landmarks
+///   4. Destination marker (red pin)
+///   5. User heading cone (compass-driven, gradient blue arc)
+///   6. User position dot (blue, on top of cone)
+///   7. Node labels for named landmarks
 class FloorMapPainter extends CustomPainter {
   final FloorMap floor;
   final MallData mallData;
   final NavigationPath? path;
   final String? userNodeId;
   final String? destinationNodeId;
+  final double? userHeading; // null = compass unavailable, no cone drawn
 
   FloorMapPainter({
     required this.floor,
@@ -25,6 +27,7 @@ class FloorMapPainter extends CustomPainter {
     this.path,
     this.userNodeId,
     this.destinationNodeId,
+    this.userHeading,
   });
 
   @override
@@ -130,12 +133,17 @@ class FloorMapPainter extends CustomPainter {
     if (node == null) return;
     final center = Offset(node.x * sx, node.y * sy);
 
+    // Draw heading cone behind the dot when compass is available
+    if (userHeading != null) {
+      _drawHeadingCone(canvas, center, userHeading!);
+    }
+
     // Outer pulse ring
     canvas.drawCircle(
       center, 18,
       Paint()..color = Colors.blue.withOpacity(0.25),
     );
-    // Inner solid dot
+    // Inner solid dot (drawn last so it sits on top of the cone)
     canvas.drawCircle(center, 10, Paint()..color = Colors.blue.shade700);
     canvas.drawCircle(
       center, 10,
@@ -144,6 +152,43 @@ class FloorMapPainter extends CustomPainter {
         ..strokeWidth = 2.5
         ..style = PaintingStyle.stroke,
     );
+  }
+
+  /// Draws a gradient cone in the direction the user is facing.
+  ///
+  /// [headingDeg]: compass bearing, 0 = north (map-up), clockwise.
+  /// The cone fades from opaque at the dot to transparent at the tip.
+  void _drawHeadingCone(Canvas canvas, Offset center, double headingDeg) {
+    const coneLength = 42.0; // screen pixels (scales with InteractiveViewer zoom)
+    const halfAngleRad = 32.0 * math.pi / 180; // 64° total cone width
+
+    // Convert compass heading to canvas angle.
+    // Canvas 0° = right (+x); north (heading 0°) must point up (-y) → subtract π/2.
+    final canvasAngle = headingDeg * math.pi / 180 - math.pi / 2;
+
+    final coneRect = Rect.fromCircle(center: center, radius: coneLength);
+
+    // Radial gradient: solid at centre, transparent at the tip
+    final paint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          Colors.blue.shade600.withOpacity(0.55),
+          Colors.blue.shade400.withOpacity(0.0),
+        ],
+        stops: const [0.0, 1.0],
+      ).createShader(coneRect)
+      ..style = PaintingStyle.fill;
+
+    final conePath = Path()
+      ..moveTo(center.dx, center.dy)
+      ..lineTo(
+        center.dx + coneLength * math.cos(canvasAngle - halfAngleRad),
+        center.dy + coneLength * math.sin(canvasAngle - halfAngleRad),
+      )
+      ..arcTo(coneRect, canvasAngle - halfAngleRad, 2 * halfAngleRad, false)
+      ..close();
+
+    canvas.drawPath(conePath, paint);
   }
 
   void _drawDestination(Canvas canvas, double sx, double sy) {
@@ -186,5 +231,6 @@ class FloorMapPainter extends CustomPainter {
       old.userNodeId != userNodeId ||
       old.destinationNodeId != destinationNodeId ||
       old.floor.id != floor.id ||
-      old.mallData.id != mallData.id;
+      old.mallData.id != mallData.id ||
+      old.userHeading != userHeading;
 }
