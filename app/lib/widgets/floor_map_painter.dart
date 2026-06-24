@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/floor_map.dart';
 import '../models/mall_data.dart';
-import '../models/poi.dart';
+import '../models/node.dart';
 import '../services/pathfinding_service.dart';
 
 /// [CustomPainter] that draws an entire floor:
@@ -11,6 +11,7 @@ import '../services/pathfinding_service.dart';
 ///   3. POI markers (orange circles)
 ///   4. User position (blue pulsing dot)
 ///   5. Destination marker (red pin)
+///   6. Node labels for named landmarks
 class FloorMapPainter extends CustomPainter {
   final FloorMap floor;
   final MallData mallData;
@@ -36,6 +37,7 @@ class FloorMapPainter extends CustomPainter {
     _drawPOIs(canvas, sx, sy);
     if (destinationNodeId != null) _drawDestination(canvas, sx, sy);
     if (userNodeId != null) _drawUser(canvas, sx, sy);
+    _drawNodeLabels(canvas, sx, sy);
   }
 
   void _drawEdges(Canvas canvas, double sx, double sy) {
@@ -59,34 +61,30 @@ class FloorMapPainter extends CustomPainter {
   void _drawPath(Canvas canvas, double sx, double sy) {
     if (path == null) return;
 
-    final nodeIds = path!.segments
-        .where((s) => s.floorId == floor.id)
-        .map((s) => s.nodeId)
-        .toList();
-
-    if (nodeIds.length < 2) return;
-
     final paint = Paint()
       ..color = Colors.blue.shade600
       ..strokeWidth = 9
       ..strokeCap = StrokeCap.round;
 
-    for (int i = 0; i < nodeIds.length - 1; i++) {
-      final from = floor.nodes[nodeIds[i]];
-      final to = floor.nodes[nodeIds[i + 1]];
+    final segments = path!.segments;
+    for (int i = 0; i < segments.length - 1; i++) {
+      final seg = segments[i];
+      final next = segments[i + 1];
+      // Only draw when both consecutive nodes are on this floor
+      if (seg.floorId != floor.id || next.floorId != floor.id) continue;
+      final from = floor.nodes[seg.nodeId];
+      final to = floor.nodes[next.nodeId];
       if (from == null || to == null) continue;
       canvas.drawLine(
         Offset(from.x * sx, from.y * sy),
         Offset(to.x * sx, to.y * sy),
         paint,
       );
-
-      // Draw a small direction chevron at the midpoint
       _drawChevron(canvas, from, to, sx, sy);
     }
   }
 
-  void _drawChevron(Canvas canvas, dynamic from, dynamic to, double sx, double sy) {
+  void _drawChevron(Canvas canvas, MapNode from, MapNode to, double sx, double sy) {
     final midX = (from.x + to.x) / 2 * sx;
     final midY = (from.y + to.y) / 2 * sy;
     final angle = math.atan2(
@@ -103,11 +101,11 @@ class FloorMapPainter extends CustomPainter {
     canvas.save();
     canvas.translate(midX, midY);
     canvas.rotate(angle);
-    final path = Path()
+    final chevron = Path()
       ..moveTo(-6, -5)
       ..lineTo(0, 0)
       ..lineTo(-6, 5);
-    canvas.drawPath(path, paint);
+    canvas.drawPath(chevron, paint);
     canvas.restore();
   }
 
@@ -163,10 +161,30 @@ class FloorMapPainter extends CustomPainter {
     );
   }
 
+  void _drawNodeLabels(Canvas canvas, double sx, double sy) {
+    for (final node in floor.nodes.values) {
+      if (node.label == null) continue;
+      final tp = TextPainter(
+        text: TextSpan(
+          text: node.label,
+          style: const TextStyle(
+            color: Colors.black54,
+            fontSize: 9,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final offset = Offset(node.x * sx - tp.width / 2, node.y * sy + 14);
+      tp.paint(canvas, offset);
+    }
+  }
+
   @override
   bool shouldRepaint(FloorMapPainter old) =>
       old.path != path ||
       old.userNodeId != userNodeId ||
       old.destinationNodeId != destinationNodeId ||
-      old.floor.id != floor.id;
+      old.floor.id != floor.id ||
+      old.mallData.id != mallData.id;
 }

@@ -39,7 +39,8 @@ class AppState extends ChangeNotifier {
 
   bool get hasLocation => _userNodeId != null;
   bool get hasDestination => _destination != null;
-  bool get isNavigating => _path != null && !_path!.isEmpty;
+  bool get hasArrived => _userNodeId != null && _destination != null && _userNodeId == _destination!.nodeId;
+  bool get isNavigating => _path != null && !_path!.isEmpty && !hasArrived;
 
   /// The next node the user should walk toward, used for the AR arrow.
   String? get nextWaypointNodeId {
@@ -82,8 +83,8 @@ class AppState extends ChangeNotifier {
 
   void setDestination(POI poi) {
     _destination = poi;
-    // Switch view to the destination's floor so the user can see where they're going
-    _currentFloorId = poi.floorId;
+    // Stay on user's floor when location is known; only switch to dest floor otherwise
+    if (!hasLocation) _currentFloorId = poi.floorId;
     _recalculatePath();
     notifyListeners();
   }
@@ -100,9 +101,9 @@ class AppState extends ChangeNotifier {
   }
 
   /// Updated continuously by the compass stream in [ARScreen].
+  /// Does NOT call notifyListeners — ARScreen reads heading from local state.
   void updateHeading(double heading) {
     _deviceHeading = heading;
-    notifyListeners();
   }
 
   // ── Internal ──────────────────────────────────────────────────────────────

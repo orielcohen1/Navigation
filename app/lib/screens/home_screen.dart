@@ -17,6 +17,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  String? _selectedCategory;
   int _bottomNavIndex = 0; // 0 = Search, 1 = Map, 2 = AR
 
   @override
@@ -57,7 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(appState.mallData?.name ?? 'Indoor Nav'),
         actions: [
-          // Scan QR button always visible
           IconButton(
             icon: const Icon(Icons.qr_code_scanner),
             tooltip: 'Scan location QR',
@@ -79,7 +79,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSearchBody(AppState appState) {
-    final pois = appState.mallData?.searchPOIs(_query) ?? [];
+    final allPois = appState.mallData?.searchPOIs(_query) ?? [];
+    final pois = _selectedCategory == null
+        ? allPois
+        : allPois.where((p) => p.category == _selectedCategory).toList();
+    final categories = (appState.mallData?.pois ?? [])
+        .map((p) => p.category)
+        .toSet()
+        .toList()
+      ..sort();
 
     return Column(
       children: [
@@ -110,13 +118,44 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
+        // ── Category filter chips ───────────────────────────────────────────
+        SizedBox(
+          height: 44,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: const Text('All'),
+                  selected: _selectedCategory == null,
+                  onSelected: (_) => setState(() => _selectedCategory = null),
+                ),
+              ),
+              ...categories.map((cat) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(cat),
+                      selected: _selectedCategory == cat,
+                      onSelected: (_) => setState(() =>
+                          _selectedCategory = _selectedCategory == cat ? null : cat),
+                    ),
+                  )),
+            ],
+          ),
+        ),
+
         // ── POI list ───────────────────────────────────────────────────────
         Expanded(
           child: pois.isEmpty
               ? const Center(child: Text('No results found.'))
               : ListView.builder(
                   itemCount: pois.length,
-                  itemBuilder: (_, i) => _POITile(poi: pois[i]),
+                  itemBuilder: (_, i) => _POITile(
+                    poi: pois[i],
+                    onShowMap: () => setState(() => _bottomNavIndex = 1),
+                  ),
                 ),
         ),
       ],
@@ -131,6 +170,34 @@ class _LocationBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+
+    // Arrived state
+    if (appState.hasArrived) {
+      return Container(
+        color: Colors.green.shade100,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'You\'ve arrived at ${appState.destination!.name}!',
+                style: TextStyle(
+                  color: Colors.green.shade800,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: appState.clearDestination,
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (appState.hasLocation) {
       return Container(
@@ -174,11 +241,13 @@ class _LocationBanner extends StatelessWidget {
 
 class _POITile extends StatelessWidget {
   final POI poi;
-  const _POITile({required this.poi});
+  final VoidCallback onShowMap;
+  const _POITile({required this.poi, required this.onShowMap});
 
   @override
   Widget build(BuildContext context) {
-    final appState = context.read<AppState>();
+    // context.watch so isSelected updates live when destination changes
+    final appState = context.watch<AppState>();
     final isSelected = appState.destination?.id == poi.id;
 
     return ListTile(
@@ -201,7 +270,7 @@ class _POITile extends StatelessWidget {
           SnackBar(
             content: Text('Navigating to ${poi.name}'),
             duration: const Duration(seconds: 2),
-            action: SnackBarAction(label: 'Map', onPressed: () {}),
+            action: SnackBarAction(label: 'Map', onPressed: onShowMap),
           ),
         );
       },

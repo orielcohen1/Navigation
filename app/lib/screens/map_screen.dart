@@ -128,6 +128,33 @@ class _NavStatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (appState.hasArrived) {
+      return Container(
+        color: Colors.green.shade600,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'You\'ve arrived at ${appState.destination!.name}!',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: appState.clearDestination,
+              child: const Text('Done', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (!appState.isNavigating) {
       return Padding(
         padding: const EdgeInsets.all(12),

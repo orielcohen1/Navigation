@@ -55,6 +55,7 @@ class _ARScreenState extends State<ARScreen> {
   void _initCompass() {
     _compassSub = FlutterCompass.events?.listen((event) {
       if (event.heading == null || !mounted) return;
+      // Only update local state — AppState.updateHeading does not notify listeners
       setState(() => _heading = event.heading!);
       context.read<AppState>().updateHeading(event.heading!);
     });
@@ -121,17 +122,28 @@ class _ARScreenState extends State<ARScreen> {
   }
 
   Widget _buildIdleOverlay(AppState appState) {
-    final message = !appState.hasLocation
-        ? 'Scan a QR code first'
-        : !appState.hasDestination
-            ? 'Select a destination from Search'
-            : 'Route ready — check Map view';
+    final String message;
+    final Color bgColor;
+
+    if (appState.hasArrived) {
+      message = 'You\'ve arrived at ${appState.destination!.name}!';
+      bgColor = Colors.green.shade800.withOpacity(0.85);
+    } else if (!appState.hasLocation) {
+      message = 'Scan a QR code first';
+      bgColor = Colors.black54;
+    } else if (!appState.hasDestination) {
+      message = 'Select a destination from Search';
+      bgColor = Colors.black54;
+    } else {
+      message = 'Route ready — check Map view';
+      bgColor = Colors.black54;
+    }
 
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.black54,
+          color: bgColor,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Text(
