@@ -70,12 +70,12 @@ class AppState extends ChangeNotifier {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  Future<void> loadMallData() async {
+  Future<void> loadMallData(String venueId) async {
     _loading = true;
     _error = null;
     notifyListeners();
     try {
-      _mallData = await _dataService.loadMallData();
+      _mallData = await _dataService.loadMallData(venueId);
       // Build graph once — reused for every subsequent findPath call
       _pathfinder = PathfindingService(_mallData!);
       _currentFloorId = _mallData!.floors.keys.first;

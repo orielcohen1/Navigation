@@ -33,6 +33,9 @@ migrate_working_dir/
 .pub/
 /build/
 
+# Supabase project credentials (each dev/deployment uses their own free project)
+lib/config/supabase_config.dart
+
 # Symbolication related
 app.*.symbols
 

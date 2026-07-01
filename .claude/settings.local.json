@@ -7,7 +7,31 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(git branch *)",
-      "Bash(git remote *)"
+      "Bash(git remote *)",
+      "Bash(git config *)",
+      "Bash(git push *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\oriel\\\\IdeaProjects\\\\Navigation\" -Recurse | Where-Object { !$_.PSIsContainer } | Select-Object FullName)",
+      "PowerShell(flutter doctor *)",
+      "Bash(git *)",
+      "PowerShell([System.Environment]::SetEnvironmentVariable\\(\"Path\", [System.Environment]::GetEnvironmentVariable\\(\"Path\", \"User\"\\) + \";C:\\\\flutter\\\\flutter\\\\bin\", [System.EnvironmentVariableTarget]::User\\))",
+      "Bash(flutter doctor *)",
+      "PowerShell(& \"C:\\\\flutter\\\\flutter\\\\bin\\\\flutter.bat\" doctor)",
+      "PowerShell(& \"C:\\\\flutter\\\\flutter\\\\bin\\\\flutter.bat\" devices)",
+      "PowerShell(& \"C:\\\\flutter\\\\flutter\\\\bin\\\\flutter.bat\" emulators)",
+      "PowerShell(& \"C:\\\\flutter\\\\flutter\\\\bin\\\\flutter.bat\" emulators --create --name pixel_8)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\emulator\\\\emulator.exe\" -list-avds)",
+      "PowerShell(Get-ChildItem *)",
+      "Skill(run)",
+      "Bash(\"C:\\\\flutter\\\\flutter\\\\bin\\\\flutter.bat\" devices *)",
+      "PowerShell(& \"C:\\\\flutter\\\\flutter\\\\bin\\\\flutter.bat\" devices --device-timeout 10)",
+      "PowerShell(& \"$env:LOCALAPPDATA\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe\" devices)",
+      "PowerShell(Start-Process \"C:\\\\Users\\\\oriel\\\\IdeaProjects\\\\Navigation\\\\admin\\\\index.html\")",
+      "PowerShell(node --version 2>$null; npx --version 2>$null)",
+      "PowerShell(supabase *)",
+      "PowerShell(dart *)",
+      "PowerShell(powershell -File tool\\\\generate_seed.ps1)",
+      "PowerShell(& \"C:\\\\flutter\\\\flutter\\\\bin\\\\flutter.bat\" --version)",
+      "PowerShell(gh auth *)"
     ]
   }
 }

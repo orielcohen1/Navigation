@@ -19,6 +19,22 @@
 2. Search "Flutter" → Install (installs Dart automatically)
 3. Restart IntelliJ
 
+### 4. Supabase project (free, no credit card needed)
+1. Go to https://supabase.com → sign up (email, no card required) → New Project
+2. Pick any name/region and set a database password (save it somewhere — you likely won't need it again, but the SQL Editor login won't ask for it)
+3. Once the project is ready: open the **SQL Editor** (left sidebar) → New query
+   - Paste the contents of `supabase/schema.sql` → Run
+   - Paste the contents of `supabase/seed.sql` → Run
+   - (Editing `app/assets/data/mall_data.json` and want to regenerate seed data? Run `powershell -File tool/generate_seed.ps1`, then re-run the new `supabase/seed.sql` in the SQL Editor.)
+4. Go to **Project Settings → API** → copy the **Project URL** and the **anon public** key
+5. Open `app/lib/config/supabase_config.dart` (create it by copying `supabase_config.example.dart` if it doesn't exist) and paste both values in
+
+Stay on the free tier — don't add a payment method. See project memory for why this is safe (no card on file = cannot be charged).
+
+Skipping this for now? The app runs fine without it — `app/lib/config/supabase_config.dart` still has placeholder
+values, so `DataService` automatically falls back to the bundled `assets/data/mall_data.json` demo venue instead of
+trying to reach a real backend. Once you fill in real values, it switches to Supabase automatically.
+
 ---
 
 ## Running the app
@@ -69,5 +85,16 @@ Generate test QR codes at https://qr.io or https://www.qr-code-generator.com
 
 ## To swap in a real mall
 
-Edit `assets/data/mall_data.json` — same schema, real coordinates.
-The navigation, AR, and map screens require zero code changes.
+Venue data now lives in Supabase, not the bundled JSON — `assets/data/mall_data.json` is kept only as the source
+for `tool/generate_seed.ps1` (handy for editing venue layouts locally and re-seeding).
+
+To add or update a venue:
+1. Edit `assets/data/mall_data.json` (or write new SQL by hand against `supabase/schema.sql`) — same schema, real coordinates
+2. Regenerate: `powershell -File tool/generate_seed.ps1`
+3. Run the resulting `supabase/seed.sql` in the Supabase SQL Editor
+4. Point the app at it by changing `_venueId` in `app/lib/main.dart`
+
+The navigation, AR, and map screens require zero code changes — only the data changes.
+
+For a visual editor instead of hand-editing JSON/SQL, use `admin/index.html` (open directly in any browser,
+no build needed) — it already supports a real floor-plan image background and printable QR code export.
